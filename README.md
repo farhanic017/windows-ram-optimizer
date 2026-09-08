@@ -2,7 +2,8 @@
 
 > **4304MB → 1569MB** on Windows 11 26200 (8GB). ReviOS-grade, one-click, permanent.
 
-[![npm version](https://img.shields.io/npm/v/windows-ram-optimizer?color=cb3837)](https://www.npmjs.com/package/windows-ram-optimizer)
+[![npm version](https://img.shields.io/npm/v/windows-ram-optimizer?color=cb3837&cacheSeconds=3600)](https://www.npmjs.com/package/windows-ram-optimizer)
+[![GitHub release](https://img.shields.io/github/v/release/farhanic017/windows-ram-optimizer?color=0b7285)](https://github.com/farhanic017/windows-ram-optimizer/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Windows 11](https://img.shields.io/badge/Windows-11-0078D6?logo=windows)](https://github.com/farhanic017/windows-ram-optimizer)
 [![Node >=18](https://img.shields.io/badge/Node-%3E%3D18-339933?logo=node.js)](package.json)
