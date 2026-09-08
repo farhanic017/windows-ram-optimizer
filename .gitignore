@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.DS_Store
+.env
+*.log
+npm-debug.log*
+manus-clone/
+NZXTCamClone/
+**/venv/
+**/__pycache__/
+**/.next/
+**/node_modules/
+C:\ProgramData\ReviOS\StartupBackup/
