@@ -1,77 +1,77 @@
 {
-    "name":  "windows-ram-optimizer",
-    "version":  "1.0.0",
-    "description":  "⚡ Make Windows 11 idle RAM 1.6GB — ReviOS-grade debloat, memory compression \u0026 RAM watchdog for 8GB PCs. One-click GUI + CLI. 4304MB → 1569MB.",
-    "main":  "src/optimizer.js",
-    "bin":  {
-                "ramfix":  "bin/ramfix.js",
-                "windows-ram-optimizer":  "bin/ramfix.js",
-                "win-ram-optimizer":  "bin/ramfix.js"
-            },
-    "scripts":  {
-                    "start":  "node bin/ramfix.js --gui",
-                    "cli":  "node bin/ramfix.js",
-                    "dev":  "node src/gui/server.js",
-                    "test":  "node tests/test.js"
-                },
-    "keywords":  [
-                     "windows",
-                     "windows11",
-                     "ram",
-                     "memory",
-                     "optimizer",
-                     "debloat",
-                     "revios",
-                     "idle-ram",
-                     "memory-compression",
-                     "watchdog",
-                     "telemetry-removal",
-                     "privacy",
-                     "performance",
-                     "gaming-optimization",
-                     "nzxt-cam",
-                     "8gb-ram",
-                     "low-ram"
-                 ],
-    "author":  "Farhan Dhrubo (https://github.com/farhanic017)",
-    "license":  "GPL-3.0-or-later",
-    "engines":  {
-                    "node":  "\u003e=18"
-                },
-    "type":  "commonjs",
-    "repository":  {
-                       "type":  "git",
-                       "url":  "git+https://github.com/farhanic017/windows-ram-optimizer.git"
-                   },
-    "files":  [
-                  "bin/",
-                  "src/",
-                  "python/",
-                  "README.md",
-                  "LICENSE"
-              ],
-    "homepage":  "https://github.com/farhanic017/windows-ram-optimizer#readme",
-    "bugs":  {
-                 "url":  "https://github.com/farhanic017/windows-ram-optimizer/issues"
-             },
-    "funding":  {
-                    "type":  "github",
-                    "url":  "https://github.com/sponsors/farhanic017"
-                },
-    "dependencies":  {
-                         "commander":  "^12.0.0",
-                         "inquirer":  "^8.2.5",
-                         "chalk":  "^4.1.2",
-                         "ora":  "^5.4.1"
-                     },
-    "pkg":  {
-                "targets":  [
-                                "node18-win-x64"
-                            ],
-                "assets":  [
-                               "src/gui/**/*",
-                               "src/**/*",
-                               "python/**/*"
-                           ]
-            }
+    "name": "windows-ram-optimizer",
+    "version": "1.0.1",
+    "description": "⚡ Make Windows 11 idle RAM 1.6GB — ReviOS-grade debloat, memory compression & RAM watchdog for 8GB PCs. One-click GUI + CLI. 4304MB → 1569MB.",
+    "main": "src/optimizer.js",
+    "bin": {
+        "ramfix": "bin/ramfix.js",
+        "windows-ram-optimizer": "bin/ramfix.js",
+        "win-ram-optimizer": "bin/ramfix.js"
+    },
+    "scripts": {
+        "start": "node bin/ramfix.js --gui",
+        "cli": "node bin/ramfix.js",
+        "dev": "node src/gui/server.js",
+        "test": "node tests/test.js"
+    },
+    "keywords": [
+        "windows",
+        "windows11",
+        "ram",
+        "memory",
+        "optimizer",
+        "debloat",
+        "revios",
+        "idle-ram",
+        "memory-compression",
+        "watchdog",
+        "telemetry-removal",
+        "privacy",
+        "performance",
+        "gaming-optimization",
+        "nzxt-cam",
+        "8gb-ram",
+        "low-ram"
+    ],
+    "author": "Farhan Dhrubo (https://github.com/farhanic017)",
+    "license": "GPL-3.0-or-later",
+    "engines": {
+        "node": ">=18"
+    },
+    "type": "commonjs",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/farhanic017/windows-ram-optimizer.git"
+    },
+    "files": [
+        "bin/",
+        "src/",
+        "python/",
+        "README.md",
+        "LICENSE"
+    ],
+    "homepage": "https://github.com/farhanic017/windows-ram-optimizer#readme",
+    "bugs": {
+        "url": "https://github.com/farhanic017/windows-ram-optimizer/issues"
+    },
+    "funding": {
+        "type": "github",
+        "url": "https://github.com/sponsors/farhanic017"
+    },
+    "dependencies": {
+        "commander": "^12.0.0",
+        "inquirer": "^8.2.5",
+        "chalk": "^4.1.2",
+        "ora": "^5.4.1"
+    },
+    "pkg": {
+        "targets": [
+            "node18-win-x64"
+        ],
+        "assets": [
+            "src/gui/**/*",
+            "src/**/*",
+            "python/**/*"
+        ]
+    }
 }

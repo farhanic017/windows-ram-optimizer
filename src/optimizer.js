@@ -57,65 +57,31 @@ const Core = {
     // persist via Run key
     fs.mkdirSync(PERM_DIR, { recursive:true });
     fs.writeFileSync(FIX_MMA, `try { Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue } catch {}\ntry { Enable-MMAgent -PageCombining -ErrorAction SilentlyContinue } catch {}\n`);
-    try { ps(`New-Item -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Force | Out-Null; Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'ReviOS_FixMMAgent' -Value 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\"${FIX_MMA}\\"' -Force`); } catch {}
+    try { ps('New-Item -Path \'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\' -Force | Out-Null; Set-ItemProperty -Path \'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\' -Name \'ReviOS_FixMMAgent\' -Value \'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + FIX_MMA + '"\' -Force'); } catch {}
     return getMMA();
   },
   fixRamWatchdog() {
     fs.mkdirSync(PERM_DIR, { recursive:true });
-    const v2 = `@'
-try { Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue } catch {}
-try { Enable-MMAgent -PageCombining -ErrorAction SilentlyContinue } catch {}
-try {
-  Add-Type "using System; using System.Runtime.InteropServices; public class Mclean { [DllImport(\\"psapi.dll\\")] public static extern bool EmptyWorkingSet(IntPtr h); }"
-  Get-Process | ForEach-Object { try { [Mclean]::EmptyWorkingSet($_.Handle) | Out-Null } catch {} }
-} catch {}
-try {
-  Add-Type @"
-using System; using System.Runtime.InteropServices;
-public class Sclean { [DllImport("ntdll.dll")] public static extern uint NtSetSystemInformation(int c, IntPtr i, int l); public static void DoClean(){ for(int k=0;k<=2;k++){ IntPtr p=Marshal.AllocHGlobal(4); Marshal.WriteInt32(p,k); NtSetSystemInformation(80,p,4); Marshal.FreeHGlobal(p); } } }
-"@
-  [Sclean]::DoClean()
-} catch {}
-[GC]::Collect()
-'@
-`.trim();
-    // Write both perm + temp mirrors
-    const permScript = `@'
-try { Enable-MMAgent -MemoryCompression -ErrorAction SilentlyContinue } catch {}
-try { Enable-MMAgent -PageCombining -ErrorAction SilentlyContinue } catch {}
-try {
-  Add-Type "using System; using System.Runtime.InteropServices; public class Mclean { [DllImport(\\"psapi.dll\\")] public static extern bool EmptyWorkingSet(IntPtr h); }"
-  Get-Process | ForEach-Object { try { [Mclean]::EmptyWorkingSet($_.Handle) | Out-Null } catch {} }
-} catch {}
-try {
-  Add-Type @"
-using System; using System.Runtime.InteropServices;
-public class Sclean { [DllImport("ntdll.dll")] public static extern uint NtSetSystemInformation(int c, IntPtr i, int l); public static void DoClean(){ for(int k=0;k<=2;k++){ IntPtr p=Marshal.AllocHGlobal(4); Marshal.WriteInt32(p,k); NtSetSystemInformation(80,p,4); Marshal.FreeHGlobal(p); } } }
-"@
-  [Sclean]::DoClean()
-} catch {}
-[GC]::Collect()
-'@;
+    // Write both perm + temp mirrors - load from asset for pkg safety
+    const permScript = fs.readFileSync(path.join(__dirname, '../assets/empty-standby.ps1'), 'utf8');
     fs.writeFileSync(PERM_SCRIPT, permScript);
     fs.writeFileSync('C:\\Windows\\Temp\\EmptyStandby.ps1', permScript);
     fs.writeFileSync('C:\\Windows\\System32\\EmptyStandby.ps1', permScript);
-    try { ps(`icacls "${PERM_SCRIPT}" /grant "NT AUTHORITY\\SYSTEM:(F)" /grant "BUILTIN\\Administrators:(F)" | Out-Null`); ps(`Add-MpPreference -ExclusionPath "${PERM_DIR}" -ErrorAction SilentlyContinue`); } catch {}
+    try { ps('icacls "' + PERM_SCRIPT + '" /grant "NT AUTHORITY\\SYSTEM:(F)" /grant "BUILTIN\\Administrators:(F)" | Out-Null'); ps('Add-MpPreference -ExclusionPath "' + PERM_DIR + '" -ErrorAction SilentlyContinue'); } catch {}
     // (re)create scheduled task: BOOT + every 2min indefinite
-    const taskPS = `
-$perm="${PERM_SCRIPT}";
-$action=New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File \`"$perm\`"";
-$boot=New-ScheduledTaskTrigger -AtStartup;
-$time=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 2);
-$principal=New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\\SYSTEM" -RunLevel Highest -LogonType ServiceAccount;
-$settings=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 1) -MultipleInstances IgnoreNew -StartWhenAvailable -Compatibility Win8;
-Register-ScheduledTask -TaskName "ReviOS-EmptyStandby" -Action $action -Trigger $boot,$time -Principal $principal -Settings $settings -Force | Out-Null;
-Enable-ScheduledTask -TaskName "ReviOS-EmptyStandby" | Out-Null;
-`;
+    const taskPS = '$perm="' + PERM_SCRIPT + '";\n' +
+'$action=New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File \\"$perm\\"";\n' +
+'$boot=New-ScheduledTaskTrigger -AtStartup;\n' +
+'$time=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 2);\n' +
+'$principal=New-ScheduledTaskPrincipal -UserId "NT AUTHORITY\\SYSTEM" -RunLevel Highest -LogonType ServiceAccount;\n' +
+'$settings=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden -ExecutionTimeLimit (New-TimeSpan -Hours 1) -MultipleInstances IgnoreNew -StartWhenAvailable -Compatibility Win8;\n' +
+'Register-ScheduledTask -TaskName "ReviOS-EmptyStandby" -Action $action -Trigger $boot,$time -Principal $principal -Settings $settings -Force | Out-Null;\n' +
+'Enable-ScheduledTask -TaskName "ReviOS-EmptyStandby" | Out-Null;';
     ps(taskPS);
     // fix collapsed Startup .bak
     try {
       const startup = STARTUP;
-      ps(`New-Item -ItemType Directory -Path "C:\\ProgramData\\ReviOS\\StartupBackup" -Force | Out-Null; Get-ChildItem "${startup}" -Filter "*.bak" -Force | ForEach-Object { Move-Item $_.FullName "C:\\ProgramData\\ReviOS\\StartupBackup\\$($_.Name)" -Force }`);
+      ps('New-Item -ItemType Directory -Path "C:\\ProgramData\\ReviOS\\StartupBackup" -Force | Out-Null; Get-ChildItem "' + startup + '" -Filter "*.bak" -Force | ForEach-Object { Move-Item $_.FullName "C:\\ProgramData\\ReviOS\\StartupBackup\\" + $_.Name + " -Force }');
     } catch {}
     return { script: PERM_SCRIPT, task: 'ReviOS-EmptyStandby' };
   },
@@ -123,7 +89,7 @@ Enable-ScheduledTask -TaskName "ReviOS-EmptyStandby" | Out-Null;
     // safe = manual for WSearch/Postgres/CAM/DSA etc. aggressive also disables
     const manual = mode==='aggressive' ? SERVICES_MANUAL : ['DSAService','DSAUpdateService','WSearch','CAMService','postgresql-x64-18'];
     manual.forEach(s=>{
-      try { ps(`Set-Service -Name ${s} -StartupType Manual -ErrorAction SilentlyContinue; Stop-Service -Name ${s} -Force -ErrorAction SilentlyContinue`); } catch {}
+      try { ps('Set-Service -Name ' + s + ' -StartupType Manual -ErrorAction SilentlyContinue; Stop-Service -Name ' + s + ' -Force -ErrorAction SilentlyContinue'); } catch {}
     });
     // also patch Asus
     try { ps('Set-Service -Name AsusUpdateCheck -StartupType Disabled -ErrorAction SilentlyContinue'); } catch {}
@@ -142,7 +108,7 @@ Set-Service -Name dmwappushservice -StartupType Disabled -ErrorAction SilentlyCo
   },
   fixCamOverlay() {
     // keep service, kill UI, create 50MB launcher + block autostart
-    try { ps(`Remove-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'NZXT.CAM' -ErrorAction SilentlyContinue`); } catch {}
+    try { ps('Remove-ItemProperty -Path \'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\' -Name \'NZXT.CAM\' -ErrorAction SilentlyContinue'); } catch {}
     const launcher = CAM_OVERLAY;
     const code = `# CAM Overlay - 50MB mode
 $cam="C:\\Program Files\\NZXT CAM\\NZXT CAM.exe"
@@ -163,8 +129,8 @@ Get-Process "NZXT CAM","cam_helper" -ErrorAction SilentlyContinue | Select-Objec
       ps(`$W=New-Object -COM WScript.Shell; $l=$W.CreateShortcut("$env:USERPROFILE\\Desktop\\CAM Overlay 50MB.lnk"); $l.TargetPath="powershell.exe"; $l.Arguments="-NoProfile -ExecutionPolicy Bypass -File \\"${launcher}\\""; $l.Save()`);
     } catch {}
     // kill current UI to hit 1.6 immediately
-    try { ps(`Get-Process "NZXT CAM" -ErrorAction SilentlyContinue | Stop-Process -Force`); } catch {}
-    try { ps(`Set-ItemProperty -Path "$env:APPDATA\\NZXT CAM\\settings.json" -Value ( (Get-Content "$env:APPDATA\\NZXT CAM\\settings.json" -Raw | ConvertFrom-Json | ForEach-Object { $_.disableHardwareAcceleration=$true; $_ } | ConvertTo-Json) ) -Force`); } catch {}
+    try { ps('Get-Process "NZXT CAM" -ErrorAction SilentlyContinue | Stop-Process -Force'); } catch {}
+    try { ps('Set-ItemProperty -Path "$env:APPDATA\\NZXT CAM\\settings.json" -Value ( (Get-Content "$env:APPDATA\\NZXT CAM\\settings.json" -Raw | ConvertFrom-Json | ForEach-Object { $_.disableHardwareAcceleration=$true; $_ } | ConvertTo-Json) ) -Force'); } catch {}
     return { launcher, shortcut: path.join(os.homedir(),'Desktop','CAM Overlay 50MB.lnk') };
   },
   runAll(opts={}) {
