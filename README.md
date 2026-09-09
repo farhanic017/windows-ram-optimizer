@@ -11,6 +11,8 @@
 
 **Tired of 3GB+ idle on 8GB?** This turns your 8GB Windows 11 into a 1.6GB idle machine — game-ready, without breaking daily use. Live-tuned from a real 3.2GB leak (taskhostw 1.4GB, MemoryCompression off, ReviOS task broken 9/6) back to **1.56GB TaskMgr**.
 
+![Task Manager - 1.4GB Idle (8GB DDR4, 18%)](assets/screenshot.png)
+
 ### ✨ Why trending
 - 🧠 **RAM watchdog** every 2min + at boot (fixes `ReviOS-EmptyStandby.ps1` deleted `4294770688` fail)
 - 🗜️ **Memory compression** (`Enable-MMAgent`) — saves ~700MB
