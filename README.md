@@ -1,4 +1,4 @@
-# ⚡ Windows RAM Optimizer — 1.6GB Idle RAM for 8GB PCs
+﻿# ⚡ Windows RAM Optimizer — 1.6GB Idle RAM for 8GB PCs
 
 > **4304MB → 1569MB** on Windows 11 26200 (8GB). ReviOS-grade, one-click, permanent.
 
@@ -11,7 +11,7 @@
 
 **Tired of 3GB+ idle on 8GB?** This turns your 8GB Windows 11 into a 1.6GB idle machine — game-ready, without breaking daily use. Live-tuned from a real 3.2GB leak (taskhostw 1.4GB, MemoryCompression off, ReviOS task broken 9/6) back to **1.56GB TaskMgr**.
 
-![Task Manager - 1.4GB Idle (8GB DDR4, 18%)](assets/screenshot.png)
+![Task Manager - 1.4GB Idle (8GB DDR4, 18%)](https://raw.githubusercontent.com/farhanic017/windows-ram-optimizer/main/assets/screenshot.png)
 
 ### ✨ Why trending
 - 🧠 **RAM watchdog** every 2min + at boot (fixes `ReviOS-EmptyStandby.ps1` deleted `4294770688` fail)
@@ -96,4 +96,5 @@ If this saved your RAM, **star ⭐ + share** — helps 8GB users find it fast.
 ---
 
 > *Tested 2026-09-07: `taskhostw 1441MB` leak killed, `Standby 3.3GB` purged, `MMA True` → `4148MB→1569MB`.*
+
 
