@@ -7,6 +7,7 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Windows 11](https://img.shields.io/badge/Windows-11-0078D6?logo=windows)](https://github.com/farhanic017/windows-ram-optimizer)
 [![Node >=18](https://img.shields.io/badge/Node-%3E%3D18-339933?logo=node.js)](package.json)
+[![ci](https://github.com/farhanic017/windows-ram-optimizer/actions/workflows/ci.yml/badge.svg)](https://github.com/farhanic017/windows-ram-optimizer/actions/workflows/ci.yml)
  <a href="https://www.patreon.com/farhanic0"><img alt="Sponsor" src="https://img.shields.io/badge/sponsor-%E2%9D%A4-pink?style=flat-square" /></a>
 
 **Tired of 3GB+ idle on 8GB?** This turns your 8GB Windows 11 into a ~1.6GB idle machine — game-ready, without breaking daily use. Live-tuned from a real 3.2GB leak (taskhostw 1.4GB, MemoryCompression off, ReviOS task broken 9/6) back to **1.56GB TaskMgr**.
