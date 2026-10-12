@@ -47,6 +47,9 @@
         "bin/",
         "src/",
         "python/",
+        "ramfix.ps1",
+        "ps/",
+        "tools/",
         "README.md",
         "LICENSE"
     ],
