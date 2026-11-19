@@ -27,13 +27,35 @@
 
 ## 🚀 Quick start — PowerShell edition (recommended)
 
-Download or clone, open **PowerShell as Administrator** in the folder:
+**Zero installs** — no Node, no npm, no Python, no git, no `Set-ExecutionPolicy`. Everything
+below uses the PowerShell that already ships with Windows.
+
+### 1) Paste this one line
+
+Open **any** PowerShell window (a normal, non-admin one is fine — it asks for UAC itself) and paste:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass -Force
-.\ramfix.ps1 -Mode Apply        # base profile (UAC prompt)
-.\ramfix.ps1 -Mode Reduce       # deep process reduction -> ~76 procs + self-heal armed
-.\ramfix.ps1 -Mode CamSetup     # optional: NZXT CAM 50MB overlay (only if you use CAM)
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/farhanic017/windows-ram-optimizer/main/ramfix.ps1 -OutFile "$env:TEMP\ramfix.ps1"; powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\ramfix.ps1" -Mode Apply
+```
+
+It downloads `ramfix.ps1`, fetches its `ps/` scripts automatically on first run, and applies the
+base profile. Your execution policy is **not** changed — `-ExecutionPolicy Bypass` applies to that
+one call only.
+
+### 2) Optional extras (same window)
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\ramfix.ps1" -Mode Reduce    # deep cut -> ~76 procs + self-heal armed
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\ramfix.ps1" -Mode CamSetup  # NZXT CAM 50MB overlay (only if you use CAM)
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\ramfix.ps1" -Mode Status    # RAM / task / watchdog log
+```
+
+### Prefer your own local copy (if you have git)
+
+```powershell
+git clone https://github.com/farhanic017/windows-ram-optimizer.git
+cd windows-ram-optimizer
+powershell -NoProfile -ExecutionPolicy Bypass -File .\ramfix.ps1 -Mode Apply
 ```
 
 ### Modes
@@ -63,6 +85,17 @@ Log lines you should see every 2 minutes:
 2026-10-12 15:38:14  trim=26 kept=45 PURGED status=0x00000000 free=5240MB admin=True
 2026-10-12 16:00:13  repair: PageCombining on        # self-heal fixed something an update reset
 ```
+
+### ❗ Manual install not working?
+
+| Symptom | Fix |
+|---|---|
+| `...running scripts is disabled on this system` | Never bare-run `.\ramfix.ps1` — Windows blocks that by default. Use `powershell -NoProfile -ExecutionPolicy Bypass -File .\ramfix.ps1 -Mode Apply`, which bypasses the policy **for that one call only**. |
+| `Set-ExecutionPolicy` "didn't stick" | `-Scope Process` lives and dies with the window you typed it in, so the next window is blocked again. With the commands above you don't need `Set-ExecutionPolicy` at all. |
+| `npx` / `npm` / `python` is not recognized | Expected — those are the *optional* editions. Nothing in Quick start needs them. |
+| UAC prompt, then nothing happens | Click **Yes** — the work runs in the elevated window. If you cancelled it, run the line again, or start PowerShell as administrator first. |
+| `irm` / TLS handshake error | Keep the `[Net.ServicePointManager]::SecurityProtocol=...` prefix from line 1 of Quick start. |
+| Still failing | **Code → Download ZIP**, extract it, open PowerShell in that folder, then `powershell -NoProfile -ExecutionPolicy Bypass -File .\ramfix.ps1 -Mode Apply`. |
 
 ---
 
@@ -120,42 +153,59 @@ Bluetooth services (`bthserv`, `BTAGService`, `BthAvctpSvc`) are **not** touched
                               # task, exclusions, page file, CAM settings, autostart)
 ```
 
-Node edition: `ramfix --revert`.
+Node / Python editions: `ramfix --revert` or `python python/optimizer.py --revert`.
 
 ---
 
-## 📦 Node / npx / Python editions (v1 — still supported)
+## 📦 Node / npx / Python editions (optional)
 
-The original one-click app. Recommended only if you already have Node/Python; the PowerShell edition above does the same job with more safety and zero dependencies.
+> **You almost certainly do not need this section.** The PowerShell edition at the top needs no
+> runtime at all and does everything below (and more). Come here only if you already have Node or
+> Python and specifically want the GUI/CLI app.
+
+Sanity check — if either of these says *"not recognized"*, stop and use the PowerShell edition:
+
+```powershell
+node -v            # Node 18+ required
+python --version
+```
+
+Want them anyway? `winget install OpenJS.NodeJS.LTS` / `winget install Python.Python.3.12`,
+then **reopen** your terminal.
 
 ### GUI App
-```bash
-npx windows-ram-optimizer --gui
-# or
+```powershell
+npx windows-ram-optimizer --gui      # runs the published package, no install
+# or keep it:
 npm i -g windows-ram-optimizer
-ramfix --gui        # same as win-ram-optimizer
+ramfix --gui                          # same thing (aliases: windows-ram-optimizer, win-ram-optimizer)
 ```
-Opens `http://localhost:8787` → **Fix now — 1.6GB idle (admin)**. Run GUI/terminal as **Administrator** (right-click → Run as admin).
+Opens `http://localhost:8787` → **Fix now — 1.6GB idle**. The header shows an `ADMIN` / `NOT ADMIN`
+badge; if it says *NOT ADMIN*, close the terminal, right-click it → **Run as administrator**, and
+start it again. (The GUI binds to `127.0.0.1` only — it is not reachable from your LAN.)
 
 ### CLI
-```bash
-ramfix                 # safe profile
+```powershell
+ramfix                 # safe profile (needs an admin terminal)
 ramfix --aggressive    # also Manual Spooler/BT/Maps
 ramfix --status        # RAM / MMA / task
-ramfix --revert        # restore WSearch/SysMain
+ramfix --revert        # undo everything this edition changed
+ramfix --gui           # the one-click web UI
 ```
 
 ### Python (Tkinter)
-```bash
-python python/optimizer.py --gui
-python python/optimizer.py
+```powershell
+python python/optimizer.py --gui     # one-click window (asks for UAC itself)
+python python/optimizer.py           # apply
+python python/optimizer.py --status
+python python/optimizer.py --revert
 ```
 
 ### 📊 What the v1 editions do
 
 | Area | Action | Saved |
 |---|---|---|
-| **RAM watchdog** | `C:\ProgramData\ReviOS\EmptyStandby.ps1` Boot + every 2min indefinite (`ReviOS-EmptyStandby` task) — `EmptyWorkingSet` + `NtSetSystemInformation 80` + `GC` | **~1.2GB** |
+| **RAM watchdog** | `C:\ProgramData\ReviOS\EmptyStandby.ps1` — Logon + every 2min (`ReviOS-EmptyStandby` task with a **silent `wscript` action**, so no console window ever pops). Deploys the graphics-safe `ps/EmptyStandby.ps1` when present, else the v1 asset | **~1.2GB** |
 | **Memory compression** | `Enable-MMAgent -MemoryCompression/-PageCombining` + `HKLM\Run ReviOS_FixMMAgent` | **~700MB** |
 | **Services** | `DSAService/DSAUpdateService/WSearch/CAMService/postgresql-x64-18 → Manual`, `AsusUpdateCheck → Disabled` | **~400MB** |
 | **Telemetry** | `DiagTrack/dmwappushservice Disabled`, `AllowTelemetry 0`, `EnableActivityFeed 0` | privacy |

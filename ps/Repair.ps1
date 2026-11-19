@@ -208,11 +208,16 @@ if ($heavy) {
     } else { $problems.Add('watchdog task missing') }
 
     if (-not $actionOk) {
-        # (re)create with the stock action - preserves nothing user-custom, only used when broken/absent
+        # (re)create with the silent wscript action - a plain powershell action pops a VISIBLE
+        # Windows Terminal window every cycle (WT ignores -WindowStyle Hidden), which steals
+        # focus and dumps games/apps to the desktop. wscript style 0 = no window at all.
         try {
             $ps = Join-Path $PermDir 'EmptyStandby.ps1'
-            $action  = New-ScheduledTaskAction -Execute 'powershell.exe' `
-                          -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ps`""
+            $vb = Join-Path $PermDir 'run-watchdog-hidden.vbs'
+            $vtext = 'Set sh = CreateObject("WScript.Shell")' + "`r`n" +
+                     'sh.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ""' + $ps + '""", 0, False' + "`r`n"
+            [System.IO.File]::WriteAllText($vb, $vtext, (New-Object System.Text.UTF8Encoding($false)))
+            $action  = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ('"{0}"' -f $vb)
             $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Highest
             $tLogon  = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
             $tRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 2)
@@ -228,13 +233,34 @@ if ($heavy) {
         } catch { $problems.Add('watchdog task register: ' + $_.Exception.Message) }
     }
 
-    # ---- 10) logon repair task self-heal (SYSTEM, no UAC, session 0 - never a window)
-    $rt = Get-ScheduledTask -TaskName 'ReviOS-LogonRepair' -ErrorAction SilentlyContinue
-    if (-not $rt -or $rt.State -eq 'Disabled') {
+    # ---- 10) logon repair task self-heal (SYSTEM, no UAC; silent wscript action)
+    # Same rule as the watchdog: -WindowStyle Hidden is ignored by Windows Terminal, so a bare
+    # powershell action is the thing that surfaces a visible window. Also verify the action's
+    # launcher still exists, otherwise a deleted .vbs silently kills the self-heal forever.
+    $rt   = Get-ScheduledTask -TaskName 'ReviOS-LogonRepair' -ErrorAction SilentlyContinue
+    $raOk = $false
+    $rWhy = 'missing'
+    if ($rt) {
+        $rWhy = 'stale action'
+        if ($rt.State -eq 'Disabled') { $rWhy = 'disabled' }
+        else {
+            $rAct = @($rt.Actions) | Select-Object -First 1
+            $rVb  = $null
+            if ($rAct -and $rAct.Execute -match 'wscript|cscript') {
+                if ($rAct.Arguments -match '"([^"]+\.vbs)"') { $rVb = $Matches[1] }
+            }
+            $raOk = ($rVb -and (Test-Path -LiteralPath $rVb))
+        }
+    }
+
+    if (-not $raOk) {
         try {
             $rp   = Join-Path $PermDir 'Repair.ps1'
-            $ra   = New-ScheduledTaskAction -Execute 'powershell.exe' `
-                        -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$rp`""
+            $rvb  = Join-Path $PermDir 'run-repair-hidden.vbs'
+            $vtxt = 'Set sh = CreateObject("WScript.Shell")' + "`r`n" +
+                    'sh.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ""' + $rp + '""", 0, False' + "`r`n"
+            [System.IO.File]::WriteAllText($rvb, $vtxt, (New-Object System.Text.UTF8Encoding($false)))
+            $ra   = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ('"{0}"' -f $rvb)
             $rtr  = New-ScheduledTaskTrigger -AtLogOn
             $rpr  = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
             $rst  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden `
@@ -242,10 +268,23 @@ if ($heavy) {
                         -StartWhenAvailable -Compatibility Win8
             Register-ScheduledTask -TaskName 'ReviOS-LogonRepair' -Action $ra -Trigger $rtr `
                 -Principal $rpr -Settings $rst -Force -ErrorAction Stop | Out-Null
+            Enable-ScheduledTask -TaskName 'ReviOS-LogonRepair' -ErrorAction SilentlyContinue | Out-Null
             if (Get-ScheduledTask -TaskName 'ReviOS-LogonRepair' -ErrorAction SilentlyContinue) {
-                $repairs.Add('ReviOS-LogonRepair task (re)registered')
+                # the reason belongs on the success line, not as a "FAILED" - it was just fixed
+                $repairs.Add("ReviOS-LogonRepair task (re)registered [$rWhy]")
             } else { $problems.Add('ReviOS-LogonRepair: created but not found') }
         } catch { $problems.Add('ReviOS-LogonRepair: ' + $_.Exception.Message) }
+    }
+
+    # A SYSTEM-principal task gets a task-file DACL without a Users read entry, so every
+    # NON-elevated `Get-ScheduledTask` / `schtasks /query` reports it as missing (it is not -
+    # it runs fine at logon, but status checks and humans can never see it). Grant read to
+    # BUILTIN\Users + Authenticated Users (SIDs, so localization cannot break the command).
+    foreach ($tn in 'ReviOS-LogonRepair', 'ReviOS-EmptyStandby') {
+        $tf = Join-Path $env:SystemRoot "System32\Tasks\$tn"
+        if (Test-Path -LiteralPath $tf) {
+            try { & icacls.exe $tf /grant '*S-1-5-32-545:(R)' /grant '*S-1-5-11:(R)' /C /Q | Out-Null } catch {}
+        }
     }
 }
 

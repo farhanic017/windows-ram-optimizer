@@ -2,18 +2,18 @@
 const { program } = require('commander');
 const chalk = require('chalk');
 const ora = require('ora');
-const inquirer = require('inquirer');
+const pkg = require('../package.json');
 const { Core, getRAM, getMMA, isAdmin } = require('../src/optimizer');
 
 program
   .name('ramfix')
-  .description('win-ram-optimizer — 1.6GB idle, debloat, compression & watchdog (ReviOS-grade)')
-  .version('1.0.0')
+  .description('windows-ram-optimizer — 1.6GB idle, debloat, compression & watchdog (ReviOS-grade)')
+  .version(pkg.version)
   .option('--gui', 'launch one-click GUI')
   .option('--aggressive', 'also set extra services to Manual (Spooler/BT etc)')
   .option('--no-telemetry', 'skip telemetry/spyware removal')
   .option('--no-cam', 'skip CAM 50MB overlay setup')
-  .option('--revert', 'revert WSearch/SysMain/task to defaults')
+  .option('--revert', 'undo everything: services, telemetry, watchdog task, Run key, Defender exclusion')
   .option('--status', 'show RAM/MMA/task status only');
 
 program.parse(process.argv);
@@ -26,11 +26,11 @@ async function main() {
 
   if (!isAdmin()) {
     console.log(chalk.red('✗ Run as Administrator (right-click → Run as admin).'));
-    console.log(chalk.gray('  npx win-ram-optimizer  needs admin for services/registry.'));
+    console.log(chalk.gray('  npx windows-ram-optimizer  needs admin for services/registry.'));
     process.exit(1);
   }
 
-  console.log(chalk.cyan.bold('\n⚡ win-ram-optimizer  (ReviOS 1.6GB profile)\n'));
+  console.log(chalk.cyan.bold('\n⚡ windows-ram-optimizer  (ReviOS 1.6GB profile)\n'));
   const before = getRAM();
   console.log(chalk.gray(`Before: ${before.used}MB / ${before.total}MB (${before.usedGB}GB)`));
 
@@ -40,10 +40,10 @@ async function main() {
     spinner.succeed('Done');
     console.log(chalk.green(`After:  ${res.ramAfter.used}MB / ${res.ramAfter.total}MB (${res.ramAfter.usedGB}GB)  saved ${(before.used - res.ramAfter.used)}MB`));
     console.log(chalk.gray(`MMA: MemoryCompression=${res.mma.MemoryCompression} PageCombining=${res.mma.PageCombining}`));
-    console.log(chalk.gray(`Task: ReviOS-EmptyStandby → Boot + every 2min (C:\\ProgramData\\ReviOS\\EmptyStandby.ps1)`));
-    console.log(chalk.gray(`CAM: 50MB overlay → Desktop\\CAM Overlay 50MB.lnk (on-demand)`));
-    console.log(chalk.yellow('\n✔ Permanent — survives reboot (ProgramData + Boot trigger + HKLM Run). Reboot to lock 1.6GB.'));
-    console.log(chalk.gray('  Revert: npx win-ram-optimizer --revert'));
+    console.log(chalk.gray(`Task: ReviOS-EmptyStandby → Logon + every 2min (silent wscript launcher, no console window)`));
+    console.log(chalk.gray(`CAM:  50MB overlay → Desktop\\CAM Overlay 50MB.lnk (on-demand)`));
+    console.log(chalk.yellow('\n✔ Permanent — survives reboot (ProgramData + Logon trigger + HKLM Run). Reboot to lock 1.6GB.'));
+    console.log(chalk.gray(`  Revert: npx windows-ram-optimizer --revert`));
   } catch (e) {
     spinner.fail(chalk.red(e.message));
     process.exit(1);
@@ -51,20 +51,38 @@ async function main() {
 }
 
 function showStatus() {
-  const r=getRAM(); const m=getMMA();
+  const r = getRAM(); const m = getMMA();
   console.log(chalk.cyan(`RAM: ${r.used}MB / ${r.total}MB (${r.usedGB}GB)`));
   console.log(chalk.gray(`MMA: ${JSON.stringify(m)}`));
-  try { const {execSync}=require('child_process'); console.log(execSync('powershell -Command "Get-ScheduledTaskInfo -TaskName ReviOS-EmptyStandby | Format-List LastRunTime,NextRunTime,LastTaskResult"',{encoding:'utf8'})); } catch {}
+  console.log(chalk.gray(`Admin: ${isAdmin() ? 'yes' : 'no'}`));
+  try {
+    const { execSync } = require('child_process');
+    console.log(execSync('powershell -NoProfile -Command "Get-ScheduledTaskInfo -TaskName ReviOS-EmptyStandby | Format-List LastRunTime,NextRunTime,LastTaskResult"', { encoding: 'utf8' }));
+  } catch { console.log(chalk.gray('Task: ReviOS-EmptyStandby not registered yet (run without --status first).')); }
 }
 function doRevert() {
-  if (!isAdmin()) { console.log(chalk.red('Admin required')); process.exit(1); }
-  Core.revert(); console.log(chalk.green('Reverted WSearch/SysMain/task.'));
+  if (!isAdmin()) { console.log(chalk.red('✗ Run as Administrator (right-click → Run as admin).')); process.exit(1); }
+  const spinner = ora('Reverting...').start();
+  try {
+    const d = Core.revert();
+    spinner.succeed('Reverted');
+    console.log(chalk.gray(`  tasks removed:     ${d.tasks.length ? d.tasks.join(', ') : 'none'}`));
+    console.log(chalk.gray(`  services restored: ${d.services.length}`));
+    console.log(chalk.gray(`  HKLM Run key:      ${d.runKey ? 'removed' : 'unchanged'}`));
+    console.log(chalk.gray(`  startup .bak:      ${d.startup} moved back`));
+    console.log(chalk.green('\n✔ Done. Memory compression is left ON.'));
+  } catch (e) {
+    spinner.fail(chalk.red(e.message));
+    process.exit(1);
+  }
 }
 function launchGui() {
-  const path=require('path'); const {spawn}=require('child_process');
-  const gui=path.join(__dirname,'..','src','gui','server.js');
-  // simple: open GUI server which serves HTML and triggers same Core
-  spawn('node',[gui],{stdio:'inherit', detached:false});
+  const path = require('path');
+  const { spawn } = require('child_process');
+  const gui = path.join(__dirname, '..', 'src', 'gui', 'server.js');
+  // process.execPath (not "node") so this also works when node is only on PATH via npx
+  const child = spawn(process.execPath, [gui], { stdio: 'inherit' });
+  child.on('exit', (code, signal) => process.exit(signal ? 1 : (code || 0)));
 }
 
 main();

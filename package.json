@@ -49,6 +49,7 @@
         "python/",
         "ramfix.ps1",
         "ps/",
+        "assets/",
         "tools/",
         "README.md",
         "LICENSE"

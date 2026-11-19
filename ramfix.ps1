@@ -33,9 +33,30 @@ $CamOverlay   = Join-Path $PermDir 'CAM-Overlay.ps1'
 $RepairScript = Join-Path $PermDir 'Repair.ps1'
 $TargetsF     = Join-Path $PermDir 'targets.json'
 $FixMMVbs     = Join-Path $PermDir 'run-fixmm-hidden.vbs'
+$WatchVbs     = Join-Path $PermDir 'run-watchdog-hidden.vbs'
 $SvcSnap      = Join-Path $PermDir 'services-before.json'
 $Assets     = Join-Path $PSScriptRoot 'ps'
 $Desktop    = Join-Path ([Environment]::GetFolderPath('Desktop')) 'CAM Overlay 50MB.lnk'
+
+# Single-file install support: `irm <raw>/ramfix.ps1 -OutFile <somewhere>` gives you this script
+# WITHOUT its ps/ sibling, and every mode Copy-Items from there (a bare clone already has it, so
+# this block is a no-op in the repo). Fetch the four deployed scripts instead of failing with
+# "Cannot find path ...\ps\EmptyStandby.ps1".
+if (-not (Test-Path -LiteralPath $Assets)) {
+    Write-Host 'Single-file download detected -> fetching the ps/ scripts from GitHub...' -ForegroundColor Yellow
+    New-Item -ItemType Directory -Path $Assets -Force | Out-Null
+    $base = 'https://raw.githubusercontent.com/farhanic017/windows-ram-optimizer/main/ps'
+    foreach ($name in 'EmptyStandby.ps1', 'Repair.ps1', 'CAM-Overlay.ps1', 'FixMMAgent.ps1') {
+        $dest = Join-Path $Assets $name
+        if (Test-Path -LiteralPath $dest) { continue }
+        try {
+            Invoke-WebRequest -UseBasicParsing -Uri "$base/$name" -OutFile $dest -TimeoutSec 30
+        } catch {
+            Remove-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue
+            throw ("ramfix.ps1 could not download {0}: {1}`nEither retry online, or download the whole repo (Code -> Download ZIP) and run ramfix.ps1 from inside it." -f $name, $_.Exception.Message)
+        }
+    }
+}
 
 function Test-IsAdmin {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -170,8 +191,13 @@ function Invoke-Apply {
     Set-ItemProperty -Path $rk -Name 'ReviOS_FixMMAgent' -Value (Get-FixMMRunValue) -Force
 
     # ---------------------------------------------------------------- 3) scheduled task (interactive so the drag guard can SEE the mouse)
-    $action  = New-ScheduledTaskAction -Execute 'powershell.exe' `
-                 -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PermScript`""
+    # Windows Terminal is the default console host on Win11: it IGNORES -WindowStyle Hidden, so a
+    # plain powershell.exe action pops a visible terminal every 2 min (focus steal / game minimized
+    # to desktop). wscript with window style 0 is the silent launcher (same trick as FixMMAgent).
+    $watchVbsTxt = 'Set sh = CreateObject("WScript.Shell")' + "`r`n" +
+                   'sh.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ""' + $PermScript + '""", 0, False' + "`r`n"
+    [System.IO.File]::WriteAllText($WatchVbs, $watchVbsTxt, (New-Object System.Text.UTF8Encoding($false)))
+    $action  = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ('"{0}"' -f $WatchVbs)
     $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Highest
     $tLogon  = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
     $tRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 2)
@@ -181,6 +207,12 @@ function Invoke-Apply {
     Register-ScheduledTask -TaskName 'ReviOS-EmptyStandby' -Action $action -Trigger $tLogon,$tRepeat `
         -Principal $principal -Settings $settings -Force | Out-Null
     Enable-ScheduledTask -TaskName 'ReviOS-EmptyStandby' | Out-Null
+    # keep the task FILE readable for non-admin status checks (Get-ScheduledTask/schtasks
+    # otherwise report a perfectly healthy task as missing); SIDs so locale cannot break it
+    $wtFile = Join-Path $env:SystemRoot 'System32\Tasks\ReviOS-EmptyStandby'
+    if (Test-Path -LiteralPath $wtFile) {
+        try { & icacls.exe $wtFile /grant '*S-1-5-32-545:(R)' /grant '*S-1-5-11:(R)' /C /Q | Out-Null } catch {}
+    }
 
     # ---------------------------------------------------------------- 4) services
     $svcList = if ($Aggressive) {
@@ -747,6 +779,12 @@ try {
         'CamSetup' { if (Invoke-CamSetup) { Write-Host 'Done.' -ForegroundColor Green } }
         'Reduce'   { Invoke-Reduce }
         'Repair'   {
+            # refresh the deployed copy first: fixes ship with the repo, and running an old
+            # deployed copy would silently keep stale self-heal logic on the machine
+            $srcRepair = Join-Path $Assets 'Repair.ps1'
+            if (Test-Path -LiteralPath $srcRepair) {
+                try { Copy-Item -LiteralPath $srcRepair $RepairScript -Force -ErrorAction Stop } catch {}
+            }
             if (Test-Path -LiteralPath $RepairScript) {
                 & powershell -NoProfile -ExecutionPolicy Bypass -File $RepairScript -Force
             } else { Write-Host 'Repair.ps1 not deployed yet - run .\ramfix.ps1 -Mode Reduce first.' -ForegroundColor Yellow }
