@@ -20,6 +20,7 @@
 > - 🎮 **Genshin-ready** — `GenshinImpact`, `NZXT CAM` and `cam_helper` are force-trimmed every 2-minute cycle, page file pinned to 16GB (commit limit 14 → 24GB)
 > - 📉 **`-Mode Reduce`** — deep process cut: svchost 50 → 27, session-0 66 → 40, OS baseline **~76 processes**
 > - 🖥️ **NZXT CAM 50MB overlay** — starts with Windows, **opens no terminal window** (the stuck-`Windows-Terminal` bug is fixed), ~60–120MB resident
+> - 🔇 **No popup windows — ever** — every scheduled task and Run entry launches through a silent `wscript` launcher. Windows Terminal (the default host on Win11) **ignores** `-WindowStyle Hidden`, so a plain `powershell.exe` task popped a visible window every 2 minutes — stealing focus and dumping games to the desktop. Not one edition does that anymore.
 > - 🛡️ **Survives Windows Update** — self-heal re-applies anything an update resets and writes a `repair:` line to the log
 > - 🐝 **Bluetooth untouched**, memory compression left ON, fully reversible (`-Mode Revert`)
 
@@ -41,6 +42,10 @@ Open **any** PowerShell window (a normal, non-admin one is fine — it asks for 
 It downloads `ramfix.ps1`, fetches its `ps/` scripts automatically on first run, and applies the
 base profile. Your execution policy is **not** changed — `-ExecutionPolicy Bypass` applies to that
 one call only.
+
+> 🔇 **No popups:** after the UAC prompt you should see *no* PowerShell/Terminal windows — the
+> watchdog is registered as a silent `wscript` action, so nothing pops every 2 minutes and your
+> game never gets dumped to the desktop. If a window does appear, it's a bug — please open an issue.
 
 ### 2) Optional extras (same window)
 
@@ -67,7 +72,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\ramfix.ps1 -Mode Apply
 | `-Mode CamSetup` | NZXT CAM → overlay-only: mini HUD on startup, hardware acceleration off, `CAMService` Automatic, logon starts the exe **directly** (no console), silent desktop shortcut |
 | `-Mode Status` | Live RAM / MMAgent / scheduled tasks / watchdog log |
 | `-Mode PurgeNow` | One purge right now (drag guard bypassed on purpose) |
-| `-Mode Repair` | Run the self-heal sweep now (it also runs automatically once per boot) |
+| `-Mode Repair` | Run the self-heal sweep now (it also runs automatically once per boot). From a clone it first re-deploys the current `ps/Repair.ps1`, so fixes are never skipped because of a stale deployed copy |
 | `-Mode Revert` | Undo everything: services, telemetry, task, exclusions, page file, CAM settings, autostart entries |
 | `-Mode Apply -Aggressive` | Also cuts Spooler / BT / Maps etc. — **not recommended** (Bluetooth is kept by default) |
 
@@ -118,7 +123,8 @@ Windows Update (and app updaters) quietly reset service start modes, re-add star
 - **the watchdog** — calls the repair in-process on its first cycle after each boot, so even a broken/missing logon task gets fixed
 - Each task re-registers the other if an update removes one
 - Every repair is logged: look for `repair:` lines in `watchdog.log`
-- `-Mode Repair` runs the sweep immediately
+- `-Mode Repair` runs the sweep immediately (and re-deploys the latest `Repair.ps1` first)
+- Every task runs a **silent `wscript` action** — never `powershell.exe` directly (see the popup note in Quick start), and their task files keep read access for normal users so `-Mode Status` / `schtasks /query` show them without needing an admin window
 
 Repairs cover: service start modes, per-user service templates, policy keys (Widgets, telemetry, activity feed), svchost split threshold, page file size, memory compression, Defender exclusion, HKLM Run entry, and Edge/OneDrive/NZXT autostart cleanup.
 
@@ -247,3 +253,4 @@ If this saved your RAM, **star ⭐ + share** — helps 8GB users find it fast.
 
 > *v1 tested 2026-09-07: `taskhostw 1441MB` leak killed, `Standby 3.3GB` purged, `MMA True` → `4148MB→1569MB`.*
 > *v2 tested 2026-10-12 (8GB, i5-11400 + UHD 730, Win11 26300): Apply `6080→~3000MB`, Reduce → svchost 50→27 / session-0 66→40 / ~76 procs, page file 16GB (commit 14→24GB), CAM overlay 7 procs ~60–120MB with no terminal window, drag-guard verified live, self-heal repaired post-update drift.*
+> *v2 popup fix tested 2026-11-20 (8GB, Win11 Education 26300): zero `WindowsTerminal` processes across 2-min watchdog cycles, `ReviOS-EmptyStandby` + `ReviOS-LogonRepair` both `wscript` actions with `LastTaskResult=0`, single-file download bootstrap verified in a clean folder, README one-liner exits 0, 54/54 contract tests.*
