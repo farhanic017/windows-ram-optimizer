@@ -1,6 +1,6 @@
 {
     "name": "windows-ram-optimizer",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "description": "⚡ Make Windows 11 idle RAM 1.6GB — ReviOS-grade debloat, memory compression & RAM watchdog for 8GB PCs. One-click GUI + CLI. 4304MB → 1569MB.",
     "main": "src/optimizer.js",
     "bin": {
